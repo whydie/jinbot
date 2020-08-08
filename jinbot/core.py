@@ -56,7 +56,7 @@ class Game:
     async def _handle_guessed(self):
         # Guessed. Send answer
         status_code = await self.session.win()
-        is_handled = await self.handle_exception(status_code)
+        is_handled = await self.handle_exception(status_code=status_code)
 
         if not is_handled:
             # Create session object for next game
@@ -159,7 +159,7 @@ class Game:
         if self.session:
             await self.send_step()
 
-    async def handle_exception(self, status_code):
+    async def handle_exception(self, status_code) -> bool:
         if status_code == "AkiTimedOut":
             # Session expired. Restart game
             created, self.session = await create_and_save_session(
@@ -170,6 +170,11 @@ class Game:
                     bot=self.bot, msg=self.msg, text=config.TEXT_SESSION_EXPIRED
                 )
                 await self.send_step()
+
+            return True
+
+        elif status_code == "CantGoBackAnyFurther":
+            await self.send_step()
 
             return True
 
@@ -212,7 +217,7 @@ class Game:
             try:
                 # Continue. Not defeated game
                 status_code = await self.session.answer(answer)
-                is_handled = await self.handle_exception(status_code)
+                is_handled = await self.handle_exception(status_code=status_code)
 
                 if not is_handled:
                     # No Exception
@@ -261,21 +266,20 @@ class Game:
 
     async def handle_back(self):
         # Ongoing game
-        try:
-            await self.session.back()
+        status_code = await self.session.back()
+        is_handled = await self.handle_exception(status_code=status_code)
+
+        if not is_handled:
             await self.send_step()
+
+            await save_session(
+                session_id=self.session_id, session=self.session, redis=self.redis,
+            )
+        elif not self.session.is_started:
             self.session.is_started = 1
             await save_session(
                 session_id=self.session_id, session=self.session, redis=self.redis,
             )
-
-        except akinator.CantGoBackAnyFurther:
-            # Already at first step. Send current step
-            await self.send_step()
-
-        except akinator.AkiTimedOut:
-            # Error occurred. Restart game
-            await self.create_and_start()
 
     async def handle_start(self):
         if not self.session_created:
@@ -283,10 +287,18 @@ class Game:
             if self.is_victory():
                 # Completed game. Start new one
                 await self.create_and_start()
+
             else:
                 # Not completed game. Send steps
                 if self.session.is_defeated:
                     self.session.is_defeated = 0
+                    await save_session(
+                        session_id=self.session_id,
+                        session=self.session,
+                        redis=self.redis,
+                    )
+
+                elif not self.session.is_started:
                     self.session.is_started = 1
                     await save_session(
                         session_id=self.session_id,
@@ -348,5 +360,6 @@ class Game:
                 session_id=session_id,
             )
             return game
+
         else:
             return None
