@@ -3,7 +3,6 @@ import time
 import asyncio
 
 from vkbottle.utils.exceptions import VKError
-from vkbottle import Message
 
 from vkapi.utils import extract_params, extract_users
 from jinbot import config
