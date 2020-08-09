@@ -57,20 +57,21 @@ async def send_messages(
                 user_ids = extract_users(conversations, min_age, now, earlier)
                 first_id = max_users if max_users < len(user_ids) else 100
 
-                await bot.api.messages.send(
-                    user_ids=user_ids[:first_id],
-                    message=message,
-                    random_id=bot.extension.random_id(),
-                )
-
-                if len(user_ids) > 100:
-                    # Second part of users, if exist
-                    await asyncio.sleep(config.ADMIN_TIMEOUT_NOTIFY)
+                if user_ids:
                     await bot.api.messages.send(
-                        user_ids=user_ids[first_id:],
+                        user_ids=user_ids[:first_id],
                         message=message,
                         random_id=bot.extension.random_id(),
                     )
+
+                    if len(user_ids) > 100:
+                        # Second part of users, if exist
+                        await asyncio.sleep(config.ADMIN_TIMEOUT_NOTIFY)
+                        await bot.api.messages.send(
+                            user_ids=user_ids[first_id:],
+                            message=message,
+                            random_id=bot.extension.random_id(),
+                        )
 
                 await asyncio.sleep(config.ADMIN_TIMEOUT_NOTIFY)
 
