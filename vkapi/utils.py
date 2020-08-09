@@ -1,5 +1,7 @@
 from jinbot import config
 
+import traceback
+
 
 def remove_admin_prefix(text: str) -> str:
     """
@@ -43,18 +45,24 @@ def extract_params(command_and_text):
 
 
 def extract_users(conversations, min_age, now, earlier):
-    if earlier:
-        # Older than min age
-        user_ids = [
-            conversation.last_message.peer_id
-            for conversation in conversations.items
-            if (now - conversation.last_message.date) > min_age
-        ]
-    else:
-        # Younger than min age
-        user_ids = [
-            conversation.last_message.peer_id
-            for conversation in conversations.items
-            if (now - conversation.last_message.date) < min_age
-        ]
-    return user_ids
+    try:
+        if earlier:
+            # Older than min age
+            user_ids = [
+                conversation.last_message.peer_id
+                for conversation in conversations.items
+                if (now - conversation.last_message.date) > min_age
+            ]
+
+        else:
+            # Younger than min age
+            user_ids = [
+                conversation.last_message.peer_id
+                for conversation in conversations.items
+                if (now - conversation.last_message.date) < min_age
+            ]
+
+        return user_ids
+    except AttributeError:
+        traceback.print_exc()
+        return []

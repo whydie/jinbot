@@ -1,6 +1,7 @@
 import typing
 import time
 import asyncio
+import traceback
 
 from vkbottle.utils.exceptions import VKError
 
@@ -78,9 +79,11 @@ async def send_messages(
         except (VKError, ValueError):
             # Some unexpected error while sending messages. Ignore
             await asyncio.sleep(config.ADMIN_TIMEOUT_API)
+            traceback.print_exc()
+
         except:
             # Some exception while sending. Just ignore
-            pass
+            traceback.print_exc()
 
 
 async def after_startup(bot):

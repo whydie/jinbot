@@ -88,9 +88,10 @@ question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
 
 class Akinator(AsyncAkinator):
-    def __init__(self, is_ended: int = 0):
+    def __init__(self, is_ended: int = 0, last_guess: str = ""):
         super().__init__()
         self.is_ended = is_ended
+        self.last_guess = last_guess
 
     async def _get_session_info(self):
         """Get uid and frontaddr from akinator.com/game"""
@@ -212,12 +213,13 @@ class Akinator(AsyncAkinator):
             "progression": self.progression,
             "question": self.question,
             "is_ended": self.is_ended,
+            "last_guess": self.last_guess,
         }
 
         if self.first_guess:
-            dump["first_guess_name"] = self.first_guess["name"]
-            dump["first_guess_description"] = self.first_guess["description"]
-            dump["first_guess_absolute_picture_path"] = self.first_guess["absolute_picture_path"]
+            dump["first_guess_name"] = self.first_guess.get("name", "")
+            dump["first_guess_description"] = self.first_guess.get("description", "")
+            dump["first_guess_absolute_picture_path"] = self.first_guess.get("absolute_picture_path", "")
         else:
             dump["first_guess_name"] = ""
             dump["first_guess_description"] = ""
@@ -245,3 +247,4 @@ class Akinator(AsyncAkinator):
         self.progression = float(dump["progression"])
         self.question = dump["question"]
         self.is_ended = int(dump["is_ended"])
+        self.last_guess = dump["last_guess"]

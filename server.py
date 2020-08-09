@@ -98,7 +98,7 @@ async def handle_start(msg: Message):
 @bot.on.message_handler(text=config.ANSWER_RESTART)
 async def handle_restart(msg: Message):
     await Game.handle_restart(
-        bot=bot, msg=msg, manager=VKManager, redis=redis, chat_id=str(msg.chat_id)
+        bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
 
 

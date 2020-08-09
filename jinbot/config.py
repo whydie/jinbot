@@ -105,7 +105,11 @@ TEXT_SERVER_DOWN = "Бот приболел и ему нужно немного 
 DEBUG = False
 
 AKINATOR_CHILD_MODE = "false"
-AKINATOR_MAX_STEPS = 79
+AKINATOR_MAX_STEPS = 80
+
+AKINATOR_ANSWER_ERROR_TEXT = "Произошла ошибка, попробуйте ещё раз 🤒\n"
+
+AKINATOR_MAXIMUM_PROGRESSION = 99  # If progression more or equal and guess is repeating then Defeated
 
 ADMIN_COMMAND_PREFIX = "//"
 ADMIN_UNKNOWN_COMMAND_TEXT = "Команда должна начинаться с redis или notify\n\n" \
