@@ -24,22 +24,20 @@ def get_object_key(manager, *object_path: str) -> str:
 
 
 async def create_session(
-    first_try: bool = True, is_defeated: int = 0, is_started: int = 1
+    first_try: bool = True, is_ended: int = 0
 ) -> typing.Optional[Akinator]:
     """
     Create session object and start it
 
     :param first_try: if True, then in case of Error try again, dont try otherwise
     :type first_try: bool, optional
-    :param is_defeated: if True, then cant continue game
-    :type is_defeated: int, optional
-    :param is_started: if True, then game was already started, wait for first message otherwise
-    :type is_started: int, optional
+    :param is_ended: if True, then cant continue game
+    :type is_ended: int, optional
     :return: Session object
     :rtype: Akinator, optional
     """
     try:
-        session = Akinator(is_defeated=is_defeated, is_started=is_started)
+        session = Akinator(is_ended=is_ended)
         await session.start_game()
 
         return session
@@ -74,7 +72,7 @@ async def save_session(session_id: str, session: Akinator, redis: Redis) -> Akin
 
 
 async def create_and_save_session(
-    session_id: str, redis: Redis, is_defeated: int = 0, is_started: int = 1
+    session_id: str, redis: Redis, is_ended: int = 0
 ) -> typing.Tuple[bool, typing.Optional[Akinator]]:
     """
     Remove session and create new one
@@ -83,14 +81,12 @@ async def create_and_save_session(
     :type session_id: str
     :param redis: Connection to DB object
     :type redis: Redis
-    :param is_defeated: if True, then then cant continue game
-    :type is_defeated: int, optional
-    :param is_started: if True, then game was already started, wait for first message otherwise
-    :type is_started: int, optional
+    :param is_ended: if True, then then cant continue game
+    :type is_ended: int, optional
     :return: True if created, False if existed and Session object
     :rtype: tuple(bool, Akinator)
     """
-    session = await create_session(is_defeated=is_defeated, is_started=is_started)
+    session = await create_session(is_ended=is_ended)
     if session:
         await save_session(session_id=session_id, session=session, redis=redis)
 

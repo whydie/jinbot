@@ -29,12 +29,15 @@ ANSWER_RESTART_NUM = "7"
 ANSWER_RESTART = [ANSWER_RESTART_TEXT, ANSWER_RESTART_TEXT_LOWER, ANSWER_RESTART_NUM]
 
 ANSWER_CONTINUE_TEXT = "Продолжить"
+ANSWER_CONTINUE_TEXT_LOWER = ANSWER_CONTINUE_TEXT.lower()
 ANSWER_CONTINUE_NUM = "8"
 
+ANSWER_WRONG_TEXT = "Неправильно"
+
 ANSWER_START_TEXT = "Начать"
-ANSWER_START_UPPER = [ANSWER_START_TEXT, "Играть", "Давай", "Привет", "Го", "Гоу", "Поехали", ANSWER_CONTINUE_TEXT]
+ANSWER_START_UPPER = [ANSWER_START_TEXT, "Играть", "Давай", "Привет", "Го", "Гоу", "Поехали", ANSWER_WRONG_TEXT]
 ANSWER_START_LOWER = [item.lower() for item in ANSWER_START_UPPER]
-ANSWER_START_OTHER = [ANSWER_CONTINUE_NUM]
+ANSWER_START_OTHER = [ANSWER_CONTINUE_TEXT, ANSWER_CONTINUE_TEXT_LOWER, ANSWER_CONTINUE_NUM]
 
 # List of answers to start
 ANSWER_START = ANSWER_START_UPPER + ANSWER_START_LOWER + ANSWER_START_OTHER
@@ -72,8 +75,10 @@ MESSAGE_INTERFACE = f"1) {ANSWER_YES_TEXT}\n" \
 VK_GROUP_ID = "bot_jin"
 
 TEXT_VICTORY = "Я думаю... Это:\n" \
-               "{name} ({description})\n" \
-               " Хочешь сыграть ещё?"
+               "{name} ({description})\n\n" \
+              f"6) {ANSWER_BACK_TEXT}\n" \
+              f"7) {ANSWER_RESTART_TEXT}\n" \
+              f"8) {ANSWER_WRONG_TEXT}, {ANSWER_CONTINUE_TEXT_LOWER}\n" \
 
 TEXT_QUESTION = "Вопрос №{step}\n" \
                 "Прогресс: {progression}\n" \
@@ -100,6 +105,7 @@ TEXT_SERVER_DOWN = "Бот приболел и ему нужно немного 
 DEBUG = False
 
 AKINATOR_CHILD_MODE = "false"
+AKINATOR_MAX_STEPS = 79
 
 ADMIN_COMMAND_PREFIX = "//"
 ADMIN_UNKNOWN_COMMAND_TEXT = "Команда должна начинаться с redis или notify\n\n" \
@@ -124,13 +130,13 @@ ADMIN_COMMAND_SEND_MESSAGE_MIN_AGE_DEFAULT = 60 * 60 * 24 * 2  # 1 Day
 ADMIN_COMMAND_SEND_MESSAGE_FILTER_DEFAULT = "all"
 ADMIN_COMMAND_SEND_MESSAGE_EARLIER_DEFAULT = 1  # 1 True, 0 False
 
-ADMIN_COMMAND_SEND_MESSAGE_RESTART_MAX_USERS = 200
+ADMIN_COMMAND_SEND_MESSAGE_RESTART_MAX_USERS = 400
 ADMIN_COMMAND_SEND_MESSAGE_RESTART_FILTER = "all"
 ADMIN_COMMAND_SEND_MESSAGE_RESTART_MIN_AGE = 60 * 2  # 2 Minutes
 ADMIN_COMMAND_SEND_MESSAGE_RESTART_ENDED_TEXT = "Бот перезапустился, ещё пару секунд и будет готов 🥳"
 
 SESSION_PROGRESS_UNSURE_VICTORY = 85
-SESSION_PROGRESS_SURE_VICTORY = 90
+SESSION_PROGRESS_SURE_VICTORY = 95
 SESSION_PROGRESS_MIN_STEP_UNSURE_VICTORY = 25
 SESSION_PROGRESS_DEFEAT = 60
 SESSION_MAX_STEPS_FIRST = 40

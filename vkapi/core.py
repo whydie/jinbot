@@ -94,7 +94,7 @@ async def after_startup(bot):
         message_filter=message_filter,
         min_age=min_age,
         max_users=max_users,
-        earlier=False,
+        earlier=0,
     )
 
 

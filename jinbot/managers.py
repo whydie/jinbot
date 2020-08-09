@@ -19,7 +19,7 @@ class AbstractManager(ABC):
 
     @staticmethod
     @abstractmethod
-    def send_image(bot, msg: Message, redis: Redis, url: str):
+    def send_image(bot, msg: Message, url: str, text: str):
         ...
 
 
@@ -27,7 +27,7 @@ class VKManager(AbstractManager):
     prefix = "VK"
 
     @staticmethod
-    async def get_or_create_image(bot: Bot, peer_id: int, redis: Redis, url: str) -> typing.Optional[str]:
+    async def get_or_create_image(bot: Bot, peer_id: int, url: str) -> typing.Optional[str]:
         """
         Try to find image-url cached in DB, make request and cache otherwise
 
@@ -51,27 +51,18 @@ class VKManager(AbstractManager):
                     fp.close()
 
                     return image
-        except VKError as exc:
-            if exc.error_code == 100:
-                # Guess without image
-                return None
+        except VKError:
+            return None
 
     @staticmethod
-    async def send_message(bot: Bot, msg: Message, text: str, first_try: bool = True):
+    async def send_message(bot: Bot, msg: Message, text: str):
         try:
             await msg(text)
-        except VKError as exc:
-            if exc.error_code == 901:
-                # No permission to send message to this user
-                pass
-            else:
-                if first_try:
-                    await VKManager.send_message(
-                        bot=bot, msg=msg, text=text, first_try=False
-                    )
+        except VKError:
+            pass
 
     @staticmethod
-    async def send_image(bot: Bot, msg: Message, redis: Redis, url: str):
+    async def send_image(bot: Bot, msg: Message, url: str, text: str = None):
         """
         Get image by url, upload it to VK and send to user
 
@@ -79,11 +70,19 @@ class VKManager(AbstractManager):
         :type bot: Bot
         :param msg: Users message object
         :type msg: Message
-        :param redis: Connection to DB object
-        :type redis: Redis
         :param url: Url to image
         :type url: str
+        :param text: Text of users message
+        :type text: str, optional
         """
-        image = await VKManager.get_or_create_image(bot=bot, peer_id=msg.peer_id, redis=redis, url=url)
+        image = await VKManager.get_or_create_image(bot=bot, peer_id=msg.peer_id, url=url)
         if image:
-            await msg(attachment=image)
+            try:
+                if text:
+                    await msg(message=text, attachment=image)
+
+                else:
+                    await msg(attachment=image)
+
+            except VKError:
+                pass

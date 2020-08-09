@@ -3,7 +3,6 @@ import traceback
 import typing
 from json import JSONDecodeError
 
-import akinator
 from aioredis.commands import Redis
 
 from jinbot import config
@@ -53,111 +52,23 @@ class Game:
         self.session_created, self.session = session_created, session
         self.redis = redis
 
-    async def _handle_guessed(self):
+    async def handle_guessed(self):
         # Guessed. Send answer
         status_code = await self.session.win()
         is_handled = await self.handle_exception(status_code=status_code)
 
         if not is_handled:
-            # Create session object for next game
-            await create_and_save_session(
-                session_id=self.session_id,
-                redis=self.redis,
-                is_defeated=0,
-                is_started=0,
-            )
-
             # No Exception after winning
+            self.session.is_ended = 1
+            await save_session(
+                session_id=self.session_id,
+                session=self.session,
+                redis=self.redis,
+            )
             await self.send_victory_message(self.session.first_guess)
 
-    def is_victory(self):
-        """
-            It's victory either when `session.progression` is more or equal than needed for sure victory
-            or if `session.step` is more than minimal needed for unsure victory,
-                and `session.progression` is more or equal than needed for unsure victory
-        """
-
-        is_sure_victory = self.session.progression >= config.SESSION_PROGRESS_SURE_VICTORY
-        is_unsure_victory = (
-            self.session.progression >= config.SESSION_PROGRESS_UNSURE_VICTORY
-            and self.session.step >= config.SESSION_PROGRESS_MIN_STEP_UNSURE_VICTORY
-        )
-
-        return is_sure_victory or is_unsure_victory
-
-    def is_defeated(self) -> int:
-        """
-        Check if bot is defeated
-
-        :return: True if bot cant guess, False otherwise
-        :rtype: bool
-        """
-        self.session.is_defeated = int(
-            (
-                self.session.step == config.SESSION_MAX_STEPS_FIRST
-                or self.session.step == config.SESSION_MAX_STEPS_SECOND
-            )
-            and self.session.progression < config.SESSION_PROGRESS_DEFEAT
-        )
-        return self.session.is_defeated
-
-    async def send_step(self, prefix_text: typing.Optional[str] = ""):
-        """
-        Send step information to user
-
-        :param prefix_text: Text to add in the beginning of message
-        :type prefix_text: str, optional
-        """
-        await self.manager.send_message(
-            bot=self.bot,
-            msg=self.msg,
-            text=prefix_text
-            + config.TEXT_QUESTION.format(
-                step=self.session.step + 1,
-                progression=f"{self.session.progression:.2f}%",
-                question=self.session.question,
-            ),
-        )
-
-    async def send_victory_message(self, guess):
-        """Send victory message and image of guess"""
-        await self.manager.send_message(
-            bot=self.bot,
-            msg=self.msg,
-            text=config.TEXT_VICTORY.format(
-                name=guess["name"], description=guess["description"]
-            ),
-        )
-
-        if guess.get("absolute_picture_path", None):
-            await self.manager.send_image(
-                bot=self.bot,
-                msg=self.msg,
-                redis=self.redis,
-                url=guess["absolute_picture_path"],
-            )
-
-    async def send_defeated_message(self, can_continue=True):
-        """
-        Send defeat message
-
-        :param can_continue: If True, then send message with suggestion to continue
-        :type can_continue: bool, optional
-        """
-        # Cant guess anymore
-        await self.manager.send_message(
-            bot=self.bot,
-            msg=self.msg,
-            text=config.TEXT_DEFEATED_CONTINUE if can_continue else config.TEXT_DEFEATED,
-        )
-
-    async def create_and_start(self):
-        """Create new session, save it to DB and send steps"""
-        created, self.session = await create_and_save_session(
-            session_id=self.session_id, redis=self.redis
-        )
-        if self.session:
-            await self.send_step()
+    def can_continue(self):
+        return self.session.step < config.AKINATOR_MAX_STEPS
 
     async def handle_exception(self, status_code) -> bool:
         if status_code == "AkiTimedOut":
@@ -181,7 +92,7 @@ class Game:
         elif status_code == "AkiNoQuestions":
             # Question limit reached. Send defeat message and restart game
             await self.create_and_start()
-            await self.send_defeated_message(can_continue=False)
+            await self.send_defeated_message()
 
             return True
 
@@ -195,6 +106,89 @@ class Game:
 
         return False
 
+    def is_victory(self):
+        """
+            It's victory either when `session.progression` is more or equal than needed for sure victory
+            or if `session.step` is more than minimal needed for unsure victory,
+                and `session.progression` is more or equal than needed for unsure victory
+        """
+
+        is_sure_victory = self.session.progression >= config.SESSION_PROGRESS_SURE_VICTORY
+        is_unsure_victory = (
+            self.session.progression >= config.SESSION_PROGRESS_UNSURE_VICTORY
+            and self.session.step >= config.SESSION_PROGRESS_MIN_STEP_UNSURE_VICTORY
+        )
+
+        return is_sure_victory or is_unsure_victory
+
+    def is_defeated(self) -> int:
+        """
+        Check if bot is defeated
+
+        :return: True if bot cant guess, False otherwise
+        :rtype: bool
+        """
+        return int(
+            (
+                self.session.step == config.SESSION_MAX_STEPS_FIRST
+                or self.session.step == config.SESSION_MAX_STEPS_SECOND
+            )
+            and self.session.progression < config.SESSION_PROGRESS_DEFEAT
+        )
+
+    async def send_step(self):
+        """
+        Send step information to user
+        """
+        await self.manager.send_message(
+            bot=self.bot,
+            msg=self.msg,
+            text=config.TEXT_QUESTION.format(
+                step=self.session.step + 1,
+                progression=f"{self.session.progression:.2f}%",
+                question=self.session.question,
+            ),
+        )
+
+    async def send_victory_message(self, guess):
+        """Send victory message and image of guess"""
+        if guess.get("absolute_picture_path", None):
+            await self.manager.send_image(
+                bot=self.bot,
+                msg=self.msg,
+                url=guess["absolute_picture_path"],
+                text=config.TEXT_VICTORY.format(
+                    name=guess["name"], description=guess["description"]
+                )
+            )
+        else:
+            await self.manager.send_message(
+                bot=self.bot,
+                msg=self.msg,
+                text=config.TEXT_VICTORY.format(
+                    name=guess["name"], description=guess["description"]
+                ),
+            )
+
+    async def send_defeated_message(self):
+        """
+        Send defeat message
+        """
+        # Cant guess anymore
+        await self.manager.send_message(
+            bot=self.bot,
+            msg=self.msg,
+            text=config.TEXT_DEFEATED_CONTINUE if self.can_continue() else config.TEXT_DEFEATED,
+        )
+
+    async def create_and_start(self):
+        """Create new session, save it to DB and send steps"""
+        created, self.session = await create_and_save_session(
+            session_id=self.session_id, redis=self.redis
+        )
+        if self.session:
+            await self.send_step()
+
     async def continue_game(self, answer: str, first_try: bool = True):
         """
         Not completed. Continue to play
@@ -204,62 +198,53 @@ class Game:
         :param first_try: If True, then in case of error run `continue_game` again, restart game otherwise
         :type first_try: bool, optional
         """
-        if not self.session.is_started:
-            self.session.is_started = 1
-            await save_session(session_id=self.session_id, session=self.session, redis=self.redis)
-            await self.send_step()
+        try:
+            # Continue. Not defeated game
+            status_code = await self.session.answer(answer)
+            is_handled = await self.handle_exception(status_code=status_code)
 
-        elif self.session.is_defeated:
-            # Tried to continue defeated game
-            await self.send_defeated_message()
+            if not is_handled:
+                # No Exception
 
-        else:
-            try:
-                # Continue. Not defeated game
-                status_code = await self.session.answer(answer)
-                is_handled = await self.handle_exception(status_code=status_code)
-
-                if not is_handled:
-                    # No Exception
-
-                    if self.is_victory():
-                        await self._handle_guessed()
-
-                    else:
-                        if self.is_defeated():
-                            await self.send_defeated_message()
-
-                        else:
-                            # Not guessed yet. Send next question to user
-                            await self.send_step()
-
-                        # Save session in DB after user answered to question
-                        await save_session(
-                            session_id=self.session_id,
-                            session=self.session,
-                            redis=self.redis,
-                        )
-
-            except (ValueError, JSONDecodeError):
-                if first_try:
-                    # Wait a little, try again
-                    await asyncio.sleep(0.2)
-                    await self.continue_game(answer=answer, first_try=False)
+                if self.is_victory():
+                    await self.handle_guessed()
 
                 else:
-                    traceback.print_exc()
-                    await self.create_and_start()
+                    self.session.is_ended = self.is_defeated()
+                    if self.session.is_ended:
+                        await self.send_defeated_message()
+
+                    else:
+                        # Not guessed yet. Send next question to user
+                        await self.send_step()
+
+                    # Save session in DB after user answered to question
+                    await save_session(
+                        session_id=self.session_id,
+                        session=self.session,
+                        redis=self.redis,
+                    )
+
+        except (ValueError, JSONDecodeError):
+            if first_try:
+                # Wait a little, try again
+                await asyncio.sleep(0.5)
+                await self.continue_game(answer=answer, first_try=False)
+
+            else:
+                await self.create_and_start()
 
     async def handle_answer(self, answer: str):
         # Known answer
         if not self.session_created:
             # Session already existed
-            if self.is_victory():
+            if self.session.is_ended:
                 # Completed game. Start new one
                 await self.create_and_start()
+
             else:
                 # Not completed game. Continue
-                await self.continue_game(answer)
+                await self.continue_game(answer=answer)
         else:
             # Just created game. Send steps
             await self.send_step()
@@ -270,42 +255,38 @@ class Game:
         is_handled = await self.handle_exception(status_code=status_code)
 
         if not is_handled:
+            self.session.is_ended = 0
+            await save_session(
+                session_id=self.session_id, session=self.session, redis=self.redis,
+            )
             await self.send_step()
-
-            await save_session(
-                session_id=self.session_id, session=self.session, redis=self.redis,
-            )
-        elif not self.session.is_started:
-            self.session.is_started = 1
-            await save_session(
-                session_id=self.session_id, session=self.session, redis=self.redis,
-            )
 
     async def handle_start(self):
         if not self.session_created:
-            # Session already existed
-            if self.is_victory():
-                # Completed game. Start new one
-                await self.create_and_start()
+            # Existed game
+            if self.session.is_ended:
+                if self.is_defeated():
+                    if self.can_continue():
+                        self.session.is_ended = 0
+                        await save_session(
+                            session_id=self.session_id,
+                            session=self.session,
+                            redis=self.redis,
+                        )
+                        await self.send_step()
+                    else:
+                        await self.create_and_start()
+
+                elif self.is_victory():
+                    self.session.is_ended = 0
+                    await save_session(
+                        session_id=self.session_id,
+                        session=self.session,
+                        redis=self.redis,
+                    )
+                    await self.send_step()
 
             else:
-                # Not completed game. Send steps
-                if self.session.is_defeated:
-                    self.session.is_defeated = 0
-                    await save_session(
-                        session_id=self.session_id,
-                        session=self.session,
-                        redis=self.redis,
-                    )
-
-                elif not self.session.is_started:
-                    self.session.is_started = 1
-                    await save_session(
-                        session_id=self.session_id,
-                        session=self.session,
-                        redis=self.redis,
-                    )
-
                 await self.send_step()
         else:
             # Just created game. Send steps

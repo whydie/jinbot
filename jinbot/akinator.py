@@ -88,10 +88,9 @@ question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
 
 class Akinator(AsyncAkinator):
-    def __init__(self, is_defeated: int = 0, is_started: int = 1):
+    def __init__(self, is_ended: int = 0):
         super().__init__()
-        self.is_defeated = is_defeated
-        self.is_started = is_started
+        self.is_ended = is_ended
 
     async def _get_session_info(self):
         """Get uid and frontaddr from akinator.com/game"""
@@ -212,8 +211,7 @@ class Akinator(AsyncAkinator):
             "frontaddr": self.frontaddr,
             "progression": self.progression,
             "question": self.question,
-            "is_defeated": self.is_defeated,
-            "is_started": self.is_started,
+            "is_ended": self.is_ended,
         }
 
         if self.first_guess:
@@ -228,7 +226,6 @@ class Akinator(AsyncAkinator):
         return dump
 
     def load_session(self, dump):
-        self.is_defeated = dump["is_defeated"]
         self.timestamp = dump["timestamp"]
         self.session = dump["session"]
         self.signature = dump["signature"]
@@ -247,5 +244,4 @@ class Akinator(AsyncAkinator):
 
         self.progression = float(dump["progression"])
         self.question = dump["question"]
-        self.is_defeated = int(dump["is_defeated"])
-        self.is_started = int(dump["is_started"])
+        self.is_ended = int(dump["is_ended"])
