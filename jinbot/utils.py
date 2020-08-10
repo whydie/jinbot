@@ -48,6 +48,7 @@ async def create_session(
         if status_code != "OK":
             # Server error. Try to update region
             update_region()
+
             return None
 
         return session
@@ -55,7 +56,7 @@ async def create_session(
     except (JSONDecodeError, AttributeError, ClientConnectionError, TimeoutError):
         if first_try:
             # Some problem with Akinator API. Wait a little and try again
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
             return await create_session(first_try=False)
 
@@ -77,7 +78,7 @@ async def save_session(session_id: str, session: Akinator, redis: Redis) -> Akin
     :rtype: Akinator
     """
     session_dump = session.dump_session()
-    await redis.hmset_dict(session_id, session_dump)
+    await redis.set(session_id, session_dump, expire=config.SESSION_EXPIRE_TIME)
 
     return session
 
@@ -120,7 +121,7 @@ async def get_or_create_session(
     :return: `True` if created, `False` if existed and Session object
     :rtype: tuple(bool, Akinator)
     """
-    session_dump = await redis.hgetall(session_id, encoding="utf-8")
+    session_dump = await redis.get(session_id, encoding="utf-8")
 
     if session_dump:
         # Founded. Load object
@@ -128,6 +129,7 @@ async def get_or_create_session(
         session.load_session(session_dump)
 
         return False, session
+
     else:
         # Not founded. Create
         session = await create_session()

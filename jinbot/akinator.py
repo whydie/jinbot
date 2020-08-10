@@ -113,8 +113,7 @@ class Akinator(AsyncAkinator):
                 ),
                 headers=HEADERS,
             ) as w:
-                text_ = await w.text()
-                resp = self._parse_response(text_)
+                resp = self._parse_response(await w.text())
 
         if resp["completion"] == "OK":
             self._update(resp)
@@ -190,35 +189,35 @@ class Akinator(AsyncAkinator):
         if self.first_guess:
             dump["first_guess_name"] = self.first_guess.get("name", "")
             dump["first_guess_description"] = self.first_guess.get("description", "")
-            dump["first_guess_absolute_picture_path"] = self.first_guess.get(
-                "absolute_picture_path", ""
-            )
+            dump["first_guess_absolute_picture_path"] = self.first_guess.get("absolute_picture_path", "")
 
         else:
             dump["first_guess_name"] = ""
             dump["first_guess_description"] = ""
             dump["first_guess_absolute_picture_path"] = ""
 
-        return dump
+        return json.dumps(dump)
 
     def load_session(self, dump):
-        self.timestamp = dump["timestamp"]
-        self.session = dump["session"]
-        self.signature = dump["signature"]
-        self.step = int(dump["step"])
-        self.frontaddr = dump["frontaddr"]
+        loaded = json.loads(dump)
 
-        if dump.get("first_guess_name"):
+        self.timestamp = loaded["timestamp"]
+        self.session = loaded["session"]
+        self.signature = loaded["signature"]
+        self.step = int(loaded["step"])
+        self.frontaddr = loaded["frontaddr"]
+
+        if loaded.get("first_guess_name"):
             self.first_guess = {
-                "name": dump["first_guess_name"],
-                "description": dump["first_guess_description"],
-                "absolute_picture_path": dump["first_guess_absolute_picture_path"],
+                "name": loaded["first_guess_name"],
+                "description": loaded["first_guess_description"],
+                "absolute_picture_path": loaded["first_guess_absolute_picture_path"],
             }
 
         else:
             self.first_guess = None
 
-        self.progression = float(dump["progression"])
-        self.question = dump["question"]
-        self.is_ended = int(dump["is_ended"])
-        self.last_guess = dump["last_guess"]
+        self.progression = float(loaded["progression"])
+        self.question = loaded["question"]
+        self.is_ended = int(loaded["is_ended"])
+        self.last_guess = loaded["last_guess"]
