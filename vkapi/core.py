@@ -134,5 +134,6 @@ async def handle_admin_notify(bot, msg, command):
         )
 
         await msg(config.ADMIN_COMMAND_END_TEXT.format(command=command))
+
     else:
         await msg(config.ADMIN_UNKNOWN_COMMAND_TEXT)

@@ -33,14 +33,13 @@ def raise_connection_error(response):
     if response == "KO - SERVER DOWN":
         return "AkiServerDown"
 
-    elif response == "KO - TIMEOUT" or response == "KO - UNAUTHORIZED":
+    if response in ("KO - TIMEOUT", "KO - UNAUTHORIZED"):
         return "AkiTimedOut"
 
-    elif response == "KO - ELEM LIST IS EMPTY" or response == "WARN - NO QUESTION":
+    if response in ("KO - ELEM LIST IS EMPTY", "WARN - NO QUESTION"):
         return "AkiNoQuestions"
 
-    else:
-        return "AkiConnectionFailure"
+    return "AkiConnectionFailure"
 
 
 soft_constraint = "ETAT%3D%27EN%27" if config.AKINATOR_CHILD_MODE == "true" else ""

@@ -3,7 +3,6 @@ from io import BytesIO
 import typing
 
 import aiohttp
-from aioredis.commands import Redis
 from vkbottle import Message, Bot
 from vkbottle.utils.exceptions import VKError
 

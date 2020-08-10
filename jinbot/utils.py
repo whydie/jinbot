@@ -60,8 +60,7 @@ async def create_session(
 
             return await create_session(first_try=False)
 
-        else:
-            return None
+        return None
 
 
 async def save_session(session_id: str, session: Akinator, redis: Redis) -> Akinator:
@@ -104,8 +103,7 @@ async def create_and_save_session(
 
         return True, session
 
-    else:
-        return False, None
+    return False, None
 
 
 async def get_or_create_session(
@@ -130,13 +128,11 @@ async def get_or_create_session(
 
         return False, session
 
-    else:
-        # Not founded. Create
-        session = await create_session()
-        if session:
-            await save_session(session_id=session_id, session=session, redis=redis)
+    # Not founded. Create
+    session = await create_session()
+    if session:
+        await save_session(session_id=session_id, session=session, redis=redis)
 
-            return True, session
+        return True, session
 
-        else:
-            return False, None
+    return False, None

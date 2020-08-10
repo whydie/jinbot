@@ -1,3 +1,60 @@
+# *** Globals
+import requests
+import json
+import re
+
+
+server_regex = re.compile(
+    '[{"translated_theme_name":"[\s\S]*","urlWs":"https:\\\/\\\/srv[0-9]+\.akinator\.com:[0-9]+\\\/ws","subject_id":"[0-9]+"}]'
+)
+
+
+def auto_get_region(lang, theme):
+    """Automatically get the uri and server from akinator.com for the specified language and theme"""
+
+    uri_ = lang + ".akinator.com"
+
+    response = requests.get("https://" + uri_)
+    match = server_regex.search(response.text)
+
+    parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
+
+    if theme == "c":
+        return {
+            "uri": uri_,
+            "server": next((i for i in parsed if i["subject_id"] == "1"), None)[
+                "urlWs"
+            ],
+        }
+
+    if theme == "a":
+        return {
+            "uri": uri_,
+            "server": next((i for i in parsed if i["subject_id"] == "14"), None)[
+                "urlWs"
+            ],
+        }
+
+    if theme == "o":
+        return {
+            "uri": uri_,
+            "server": next((i for i in parsed if i["subject_id"] == "2"), None)[
+                "urlWs"
+            ],
+        }
+
+    return None
+
+
+def init_akinator():
+    global uri, server
+    region_info = auto_get_region("ru", "c")
+    if region_info:
+        uri, server = region_info["uri"], region_info["server"]
+
+# Globals ***
+
+
 # *** Game settings
 # --- Answer texts
 ANSWER_YES_TEXT = "Да"
@@ -178,55 +235,3 @@ ADMIN_COMMAND_SEND_MESSAGE_RESTART_EARLIER = 0  # 0 Younger than min age, 1 Olde
 DEBUG = False
 VK_GROUP_ID = "bot_jin"
 # Other settings ***
-
-
-# *** Globals
-import requests
-import json
-import re
-server_regex = re.compile(
-    '[{"translated_theme_name":"[\s\S]*","urlWs":"https:\\\/\\\/srv[0-9]+\.akinator\.com:[0-9]+\\\/ws","subject_id":"[0-9]+"}]'
-)
-
-
-def auto_get_region(lang, theme):
-    """Automatically get the uri and server from akinator.com for the specified language and theme"""
-
-    uri = lang + ".akinator.com"
-
-    response = requests.get("https://" + uri)
-    match = server_regex.search(response.text)
-
-    parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
-
-    if theme == "c":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "1"), None)[
-                "urlWs"
-            ],
-        }
-
-    elif theme == "a":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "14"), None)[
-                "urlWs"
-            ],
-        }
-
-    elif theme == "o":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "2"), None)[
-                "urlWs"
-            ],
-        }
-
-
-def init_akinator():
-    global uri, server
-    region_info = auto_get_region("ru", "c")
-    uri, server = region_info["uri"], region_info["server"]
-
-# Globals ***

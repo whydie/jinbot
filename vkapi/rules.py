@@ -9,5 +9,6 @@ class CommandFromAdmin(AbstractMessageRule):
         self.admin_list = admin_list
 
     async def check(self, message: Message) -> bool:
-        if (message.from_id in self.admin_list) and message.text.startswith(config.ADMIN_COMMAND_PREFIX):
+        if (message.from_id in self.admin_list) \
+                and message.text.startswith(config.ADMIN_COMMAND_PREFIX):
             return True

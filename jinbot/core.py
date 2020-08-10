@@ -89,9 +89,7 @@ class Game:
         )
 
     async def send_step(self, prefix_text: str = ""):
-        """
-        Send step information to user
-        """
+        """Send step information to user"""
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
@@ -126,9 +124,7 @@ class Game:
             )
 
     async def send_defeated_message(self, can_continue: bool = True):
-        """
-        Send defeat message
-        """
+        """Send defeat message"""
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
@@ -138,7 +134,7 @@ class Game:
     async def handle_exception(self, status_code: str) -> bool:
         if status_code == "AkiTimedOut":
             # Session expired. Restart game
-            created, self.session = await create_and_save_session(
+            _, self.session = await create_and_save_session(
                 session_id=self.session_id, redis=self.redis
             )
 
@@ -150,18 +146,18 @@ class Game:
 
             return True
 
-        elif status_code == "CantGoBackAnyFurther":
+        if status_code == "CantGoBackAnyFurther":
             await self.send_step()
 
             return True
 
-        elif status_code == "AkiNoQuestions":
+        if status_code == "AkiNoQuestions":
             # Question limit reached. Send defeat message and restart game
             await self.send_defeated_message(can_continue=False)
 
             return True
 
-        elif status_code == "AkiServerDown":
+        if status_code == "AkiServerDown":
             # Akinator server is down. Try to update region and Send message
             update_region()
             await self.manager.send_message(
@@ -216,7 +212,7 @@ class Game:
 
     async def create_and_start(self, prefix_text: str = ""):
         """Create new session, save it to DB and send steps"""
-        created, self.session = await create_and_save_session(
+        _, self.session = await create_and_save_session(
             session_id=self.session_id, redis=self.redis
         )
         if self.session:
@@ -352,7 +348,7 @@ class Game:
         chat_id: str,
     ):
         """Restart game. Create new session, save it to DB and send steps"""
-        created, session = await create_and_save_session(
+        _, session = await create_and_save_session(
             session_id=get_object_key(manager, "session", chat_id), redis=redis
         )
         if session:
@@ -409,5 +405,4 @@ class Game:
 
             return game
 
-        else:
-            return None
+        return None
