@@ -132,9 +132,7 @@ class Game:
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
-            text=config.TEXT_DEFEATED_CONTINUE
-            if can_continue
-            else config.TEXT_DEFEATED,
+            text=config.TEXT_DEFEATED_CONTINUE if can_continue else config.TEXT_DEFEATED,
         )
 
     async def handle_exception(self, status_code: str) -> bool:
@@ -181,7 +179,6 @@ class Game:
 
         if not caught_exception:
             # No Exception after winning
-
             is_repeating = (
                 self.session.first_guess.get("name") == self.session.last_guess
             )
@@ -242,9 +239,7 @@ class Game:
         try:
             # Continue. Not defeated game
             status_code = await self.session.answer(answer)
-            print(config.uri, config.server, "\n\n")
-            caught_exception = await self.handle_exception(status_code="AkiServerDown")
-            print(config.uri, config.server, "\n\n")
+            caught_exception = await self.handle_exception(status_code=status_code)
 
             if not caught_exception:
                 if self.is_victory():

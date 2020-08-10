@@ -113,9 +113,11 @@ async def handle_restart(msg: Message):
 async def handle_answer(msg: Message):
     answer = config.ANSWERS.get(msg.text, None)
     if answer:
+        # Known answer
         game = await Game.factory_game(
             bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
         )
+
         if game:
             await game.handle_answer(answer=answer)
 
@@ -123,11 +125,14 @@ async def handle_answer(msg: Message):
             await msg(config.TEXT_SERVER_DOWN)
 
     else:
+        # Unknown answer
         await VKManager.send_message(bot=bot, msg=msg, text=config.TEXT_UNKNOWN_COMMAND)
 
 
 if __name__ == "__main__":
+    # Initialize akinator global vars
     config.init_akinator()
+
     if config.DEBUG:
         bot.run_polling()
 
