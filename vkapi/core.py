@@ -92,13 +92,15 @@ async def after_startup(bot):
     min_age = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_MIN_AGE
     message_filter = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_FILTER
     message = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_ENDED_TEXT
+    earlier = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_EARLIER
+
     await send_messages(
         bot=bot,
         message=message,
         message_filter=message_filter,
         min_age=min_age,
         max_users=max_users,
-        earlier=0,
+        earlier=earlier,
     )
 
 

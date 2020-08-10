@@ -3,14 +3,11 @@ import re
 import time
 
 import aiohttp
-import requests
 from akinator.async_aki import Akinator as AsyncAkinator
 
 from jinbot import config
 
-server_regex = re.compile(
-    '[{"translated_theme_name":"[\s\S]*","urlWs":"https:\\\/\\\/srv[0-9]+\.akinator\.com:[0-9]+\\\/ws","subject_id":"[0-9]+"}]'
-)
+
 info_regex = re.compile("var uid_ext_session = '(.*)'\\;\\n.*var frontaddr = '(.*)'\\;")
 
 # URLs for the API requests
@@ -32,46 +29,11 @@ HEADERS = {
 }
 
 
-def auto_get_region(lang, theme):
-    """Automatically get the uri and server from akinator.com for the specified language and theme"""
-
-    uri = lang + ".akinator.com"
-
-    response = requests.get("https://" + uri)
-    match = server_regex.search(response.text)
-
-    parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
-
-    if theme == "c":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "1"), None)[
-                "urlWs"
-            ],
-        }
-
-    elif theme == "a":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "14"), None)[
-                "urlWs"
-            ],
-        }
-
-    elif theme == "o":
-        return {
-            "uri": uri,
-            "server": next((i for i in parsed if i["subject_id"] == "2"), None)[
-                "urlWs"
-            ],
-        }
-
-
 def raise_connection_error(response):
     if response == "KO - SERVER DOWN":
         return "AkiServerDown"
 
-    elif response == "KO - TIMEOUT":
+    elif response == "KO - TIMEOUT" or response == "KO - UNAUTHORIZED":
         return "AkiTimedOut"
 
     elif response == "KO - ELEM LIST IS EMPTY" or response == "WARN - NO QUESTION":
@@ -81,8 +43,6 @@ def raise_connection_error(response):
         return "AkiConnectionFailure"
 
 
-region_info = auto_get_region("ru", "c")
-uri, server = region_info["uri"], region_info["server"]
 soft_constraint = "ETAT%3D%27EN%27" if config.AKINATOR_CHILD_MODE == "true" else ""
 question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
@@ -101,17 +61,23 @@ class Akinator(AsyncAkinator):
 
         self.uid, self.frontaddr = match.groups()[0], match.groups()[1]
 
-    async def start_game(self):
-        self.timestamp = time.time()
+    def _parse_response(self, response):
+        """Parse the JSON response and turn it into a Python object"""
+        if "KO - UNAUTHORIZED" in response:
+            return {"completion": "KO - UNAUTHORIZED"}
 
+        return json.loads(",".join(response.split("(")[1::])[:-1])
+
+    async def start_game(self, **kwargs):
+        self.timestamp = time.time()
         await self._get_session_info()
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 NEW_SESSION_URL.format(
-                    uri,
+                    config.uri,
                     self.timestamp,
-                    server,
+                    config.server,
                     config.AKINATOR_CHILD_MODE,
                     self.uid,
                     self.frontaddr,
@@ -124,6 +90,7 @@ class Akinator(AsyncAkinator):
 
         if resp["completion"] == "OK":
             self._update(resp, True)
+
             return resp["completion"]
 
         else:
@@ -133,9 +100,9 @@ class Akinator(AsyncAkinator):
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 ANSWER_URL.format(
-                    uri,
+                    config.uri,
                     self.timestamp,
-                    server,
+                    config.server,
                     config.AKINATOR_CHILD_MODE,
                     self.session,
                     self.signature,
@@ -146,10 +113,12 @@ class Akinator(AsyncAkinator):
                 ),
                 headers=HEADERS,
             ) as w:
-                resp = self._parse_response(await w.text())
+                text_ = await w.text()
+                resp = self._parse_response(text_)
 
         if resp["completion"] == "OK":
             self._update(resp)
+
             return resp["completion"]
 
         else:
@@ -162,7 +131,7 @@ class Akinator(AsyncAkinator):
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 BACK_URL.format(
-                    server,
+                    config.server,
                     self.timestamp,
                     config.AKINATOR_CHILD_MODE,
                     self.session,
@@ -176,6 +145,7 @@ class Akinator(AsyncAkinator):
 
         if resp["completion"] == "OK":
             self._update(resp)
+
             return resp["completion"]
 
         else:
@@ -185,7 +155,7 @@ class Akinator(AsyncAkinator):
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 WIN_URL.format(
-                    server,
+                    config.server,
                     self.timestamp,
                     config.AKINATOR_CHILD_MODE,
                     self.session,
@@ -198,6 +168,7 @@ class Akinator(AsyncAkinator):
 
         if resp["completion"] == "OK":
             self.first_guess = resp["parameters"]["elements"][0]["element"]
+
             return resp["completion"]
 
         else:
@@ -219,7 +190,10 @@ class Akinator(AsyncAkinator):
         if self.first_guess:
             dump["first_guess_name"] = self.first_guess.get("name", "")
             dump["first_guess_description"] = self.first_guess.get("description", "")
-            dump["first_guess_absolute_picture_path"] = self.first_guess.get("absolute_picture_path", "")
+            dump["first_guess_absolute_picture_path"] = self.first_guess.get(
+                "absolute_picture_path", ""
+            )
+
         else:
             dump["first_guess_name"] = ""
             dump["first_guess_description"] = ""

@@ -6,8 +6,8 @@ from json.decoder import JSONDecodeError
 from aiohttp import ClientConnectionError
 from aioredis.commands import Redis
 
-from jinbot import config
 from jinbot.akinator import Akinator
+from jinbot import config
 
 
 def get_object_key(manager, *object_path: str) -> str:
@@ -21,6 +21,11 @@ def get_object_key(manager, *object_path: str) -> str:
     :return: Unique key for object
     """
     return "||".join([manager.prefix, *object_path])
+
+
+def update_region():
+    region_info = config.auto_get_region("ru", "c")
+    config.uri, config.server = region_info["uri"], region_info["server"]
 
 
 async def create_session(
@@ -38,7 +43,12 @@ async def create_session(
     """
     try:
         session = Akinator(is_ended=is_ended)
-        await session.start_game()
+        status_code = await session.start_game()
+
+        if status_code != "OK":
+            # Server error. Try to update region
+            update_region()
+            return None
 
         return session
 
@@ -48,6 +58,7 @@ async def create_session(
             await asyncio.sleep(1)
 
             return await create_session(first_try=False)
+
         else:
             return None
 
@@ -91,13 +102,14 @@ async def create_and_save_session(
         await save_session(session_id=session_id, session=session, redis=redis)
 
         return True, session
+
     else:
         return False, None
 
 
 async def get_or_create_session(
     session_id: str, redis: Redis
-) -> typing.Tuple[bool, Akinator]:
+) -> typing.Tuple[bool, typing.Optional[Akinator]]:
     """
     Find Session object in DB, create if not founded
 
@@ -114,14 +126,15 @@ async def get_or_create_session(
         # Founded. Load object
         session = Akinator()
         session.load_session(session_dump)
-        created = False
+
+        return False, session
     else:
         # Not founded. Create
         session = await create_session()
         if session:
             await save_session(session_id=session_id, session=session, redis=redis)
-            created = True
-        else:
-            created = False
 
-    return created, session
+            return True, session
+
+        else:
+            return False, None

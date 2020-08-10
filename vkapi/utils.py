@@ -51,7 +51,7 @@ def extract_users(conversations, min_age, now, earlier):
             user_ids = [
                 conversation.last_message.peer_id
                 for conversation in conversations.items
-                if (now - conversation.last_message.date) > min_age
+                if getattr(conversation, "last_message", False) and ((now - conversation.last_message.date) > min_age)
             ]
 
         else:
@@ -59,10 +59,11 @@ def extract_users(conversations, min_age, now, earlier):
             user_ids = [
                 conversation.last_message.peer_id
                 for conversation in conversations.items
-                if (now - conversation.last_message.date) < min_age
+                if getattr(conversation, "last_message", False) and (now - conversation.last_message.date) < min_age
             ]
 
         return user_ids
+
     except AttributeError:
         traceback.print_exc()
         return []

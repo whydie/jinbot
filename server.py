@@ -84,15 +84,22 @@ async def handle_back(msg: Message):
     game = await Game.factory_game(
         bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
-    await game.handle_back()
+    if game:
+        await game.handle_back()
+    else:
+        await msg(config.TEXT_SERVER_DOWN)
 
 
-@bot.on.message_handler(text=config.ANSWER_START)
-async def handle_start(msg: Message):
+@bot.on.message_handler(text=config.ANSWER_CONTINUE)
+async def handle_continue(msg: Message):
     game = await Game.factory_game(
         bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
-    await game.handle_start()
+    if game:
+        await game.handle_continue()
+
+    else:
+        await msg(config.TEXT_SERVER_DOWN)
 
 
 @bot.on.message_handler(text=config.ANSWER_RESTART)
@@ -109,13 +116,18 @@ async def handle_answer(msg: Message):
         game = await Game.factory_game(
             bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
         )
-        await game.handle_answer(answer=answer)
+        if game:
+            await game.handle_answer(answer=answer)
+
+        else:
+            await msg(config.TEXT_SERVER_DOWN)
 
     else:
         await VKManager.send_message(bot=bot, msg=msg, text=config.TEXT_UNKNOWN_COMMAND)
 
 
 if __name__ == "__main__":
+    config.init_akinator()
     if config.DEBUG:
         bot.run_polling()
 

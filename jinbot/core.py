@@ -1,9 +1,9 @@
 import asyncio
-import traceback
 import typing
 from json import JSONDecodeError
 
 from aioredis.commands import Redis
+from vkbottle import Message
 
 from jinbot import config
 from jinbot.akinator import Akinator
@@ -13,6 +13,7 @@ from jinbot.utils import (
     create_and_save_session,
     get_or_create_session,
     get_object_key,
+    update_region
 )
 
 
@@ -22,7 +23,7 @@ class Game:
 
     :param bot: Bot object that contains API-methods of specific interface
     :param manager: Message Manager object
-    :type manager: AbstractManager
+    :type manager: Type[AbstractManager]
     :param session_created: True If session was created, False if already existed
     :type session_created: bool
     :param session: Session object
@@ -37,7 +38,7 @@ class Game:
     def __init__(
         self,
         bot,
-        manager: AbstractManager,
+        manager: typing.Type[AbstractManager],
         session_created: bool,
         session: Akinator,
         msg,
@@ -57,12 +58,14 @@ class Game:
 
     def is_victory(self):
         """
-            It's victory either when `session.progression` is more or equal than needed for sure victory
-            or if `session.step` is more or equal than minimal needed for unsure victory,
-                and `session.progression` is more or equal than needed for unsure victory
+        It's victory either when `session.progression` is more or equal than needed for sure victory
+        or if `session.step` is more or equal than minimal needed for unsure victory,
+            and `session.progression` is more or equal than needed for unsure victory
         """
 
-        is_sure_victory = self.session.progression >= config.SESSION_PROGRESS_SURE_VICTORY
+        is_sure_victory = (
+            self.session.progression >= config.SESSION_PROGRESS_SURE_VICTORY
+        )
         is_unsure_victory = (
             self.session.progression >= config.SESSION_PROGRESS_UNSURE_VICTORY
             and self.session.step >= config.SESSION_PROGRESS_MIN_STEP_UNSURE_VICTORY
@@ -92,14 +95,15 @@ class Game:
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
-            text=prefix_text + config.TEXT_QUESTION.format(
+            text=prefix_text
+            + config.TEXT_QUESTION.format(
                 step=self.session.step + 1,
                 progression=f"{self.session.progression:.2f}%",
                 question=self.session.question,
             ),
         )
 
-    async def send_victory_message(self, guess):
+    async def send_victory_message(self, guess: dict):
         """Send victory message and image of guess"""
         if guess.get("absolute_picture_path", None):
             # Guess without image
@@ -109,7 +113,7 @@ class Game:
                 url=guess["absolute_picture_path"],
                 text=config.TEXT_VICTORY.format(
                     name=guess["name"], description=guess["description"]
-                )
+                ),
             )
         else:
             # Guess with image
@@ -128,7 +132,9 @@ class Game:
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
-            text=config.TEXT_DEFEATED_CONTINUE if can_continue else config.TEXT_DEFEATED,
+            text=config.TEXT_DEFEATED_CONTINUE
+            if can_continue
+            else config.TEXT_DEFEATED,
         )
 
     async def handle_exception(self, status_code: str) -> bool:
@@ -137,6 +143,7 @@ class Game:
             created, self.session = await create_and_save_session(
                 session_id=self.session_id, redis=self.redis
             )
+
             if self.session:
                 await self.manager.send_message(
                     bot=self.bot, msg=self.msg, text=config.TEXT_SESSION_EXPIRED
@@ -157,7 +164,8 @@ class Game:
             return True
 
         elif status_code == "AkiServerDown":
-            # Akinator server is down. Send message
+            # Akinator server is down. Try to update region and Send message
+            update_region()
             await self.manager.send_message(
                 bot=self.bot, msg=self.msg, text=config.TEXT_SERVER_DOWN
             )
@@ -174,10 +182,14 @@ class Game:
         if not caught_exception:
             # No Exception after winning
 
-            is_repeating = self.session.first_guess.get("name") == self.session.last_guess
+            is_repeating = (
+                self.session.first_guess.get("name") == self.session.last_guess
+            )
             if is_repeating:
                 # Repeated guess
-                no_other_guesses = self.session.progression >= config.AKINATOR_MAXIMUM_PROGRESSION
+                no_other_guesses = (
+                    self.session.progression >= config.SESSION_MAXIMUM_PROGRESSION
+                )
                 if no_other_guesses:
                     # Repeated guess got maximum progress, so most probably there is no other guesses
                     self.session.is_ended = 1
@@ -199,23 +211,24 @@ class Game:
 
             else:
                 self.session.is_ended = 1
-                print("\n\n", self.session.last_guess, self.session.first_guess["name"], "\n\n")
                 self.session.last_guess = self.session.first_guess["name"]
-                print("\n\n", self.session.last_guess, self.session.first_guess["name"], "\n\n")
                 await save_session(
-                    session_id=self.session_id,
-                    session=self.session,
-                    redis=self.redis,
+                    session_id=self.session_id, session=self.session, redis=self.redis,
                 )
                 await self.send_victory_message(self.session.first_guess)
 
-    async def create_and_start(self):
+    async def create_and_start(self, prefix_text: str = ""):
         """Create new session, save it to DB and send steps"""
         created, self.session = await create_and_save_session(
             session_id=self.session_id, redis=self.redis
         )
         if self.session:
-            await self.send_step()
+            await self.send_step(prefix_text=prefix_text)
+
+        else:
+            await self.manager.send_message(
+                bot=self.bot, msg=self.msg, text=config.TEXT_SERVER_DOWN
+            )
 
     async def continue_game(self, answer: str, first_try: bool = True):
         """
@@ -229,7 +242,9 @@ class Game:
         try:
             # Continue. Not defeated game
             status_code = await self.session.answer(answer)
-            caught_exception = await self.handle_exception(status_code=status_code)
+            print(config.uri, config.server, "\n\n")
+            caught_exception = await self.handle_exception(status_code="AkiServerDown")
+            print(config.uri, config.server, "\n\n")
 
             if not caught_exception:
                 if self.is_victory():
@@ -240,7 +255,9 @@ class Game:
                     self.session.is_ended = self.is_defeat()
                     if self.session.is_ended:
                         # Defeated game
-                        await self.send_defeated_message(can_continue=self.can_continue())
+                        await self.send_defeated_message(
+                            can_continue=self.can_continue()
+                        )
 
                     else:
                         # Not guessed yet. Send next question to user
@@ -260,8 +277,8 @@ class Game:
                 await self.continue_game(answer=answer, first_try=False)
 
             else:
-                # Error occurred. Send step with error message
-                await self.send_step(prefix_text=config.AKINATOR_ANSWER_ERROR_TEXT)
+                # Error occurred. Create and send step with error message
+                await self.create_and_start(prefix_text=config.TEXT_ANSWER_ERROR)
 
     async def handle_answer(self, answer: str):
         # Known answer
@@ -294,12 +311,14 @@ class Game:
             )
             await self.send_step()
 
-    async def handle_start(self):
+    async def handle_continue(self):
         if not self.session_created:
             # Existed game
             if self.session.is_ended:
                 # Game ended
-                no_other_guesses = self.session.progression >= config.AKINATOR_MAXIMUM_PROGRESSION
+                no_other_guesses = (
+                    self.session.progression >= config.SESSION_MAXIMUM_PROGRESSION
+                )
                 if no_other_guesses:
                     # No other guesses, no reason to continue. Restart game
                     await self.create_and_start()
@@ -330,7 +349,13 @@ class Game:
             await self.send_step()
 
     @staticmethod
-    async def handle_restart(bot, manager, msg, redis, chat_id):
+    async def handle_restart(
+        bot,
+        manager: typing.Type[AbstractManager],
+        msg: Message,
+        redis: Redis,
+        chat_id: str,
+    ):
         """Restart game. Create new session, save it to DB and send steps"""
         created, session = await create_and_save_session(
             session_id=get_object_key(manager, "session", chat_id), redis=redis
@@ -346,9 +371,16 @@ class Game:
                 ),
             )
 
+        else:
+            await manager.send_message(bot=bot, msg=msg, text=config.TEXT_SERVER_DOWN)
+
     @staticmethod
     async def factory_game(
-        bot, manager: typing.Type[AbstractManager], msg, redis: Redis, chat_id: str
+        bot,
+        manager: typing.Type[AbstractManager],
+        msg: Message,
+        redis: Redis,
+        chat_id: str,
     ):
         """
         Factory method that returns Game object
@@ -357,6 +389,7 @@ class Game:
         :param manager: Message Manager object
         :type manager: AbstractManager
         :param msg: Users Message object
+        :type msg: Message
         :param redis: Connection to DB object
         :type redis: Redis
         :param chat_id: Unique id of chat
@@ -367,6 +400,7 @@ class Game:
         created, session = await get_or_create_session(
             session_id=session_id, redis=redis
         )
+
         if session:
             game = Game(
                 bot=bot,
@@ -377,6 +411,7 @@ class Game:
                 redis=redis,
                 session_id=session_id,
             )
+
             return game
 
         else:
