@@ -2,6 +2,7 @@ import asyncio
 import typing
 from json import JSONDecodeError
 
+from aiohttp.client_exceptions import ClientConnectionError
 from aioredis.commands import Redis
 from vkbottle import Message
 
@@ -13,7 +14,7 @@ from jinbot.utils import (
     create_and_save_session,
     get_or_create_session,
     get_object_key,
-    update_region
+    update_region,
 )
 
 
@@ -54,13 +55,18 @@ class Game:
 
     def can_continue(self):
         # Akinator counting starts with 0, so minus 1 from max steps
-        return self.session.step < config.AKINATOR_MAX_STEPS - 1
+        return (self.session.step < config.AKINATOR_MAX_STEPS - 1) \
+               and self.session.progression < config.SESSION_PROGRESS_SURE_VICTORY
+
+    def are_guesses_left(self):
+        """There is no other guesses when we already have guessed something and progression is more than maximum progression"""
+        return not(self.session.last_guess and not self.can_continue())
 
     def is_victory(self):
         """
-        It's victory either when `session.progression` is more or equal than needed for sure victory
-        or if `session.step` is more or equal than minimal needed for unsure victory,
-            and `session.progression` is more or equal than needed for unsure victory
+        It's victory either when `self.session.progression` is more or equal than needed for sure victory
+        or if `self.session.step` is more or equal than minimal needed for unsure victory,
+           and `self.session.progression` is more or equal than needed for unsure victory
         """
 
         is_sure_victory = (
@@ -75,7 +81,7 @@ class Game:
 
     def is_defeat(self) -> int:
         """
-        Check if bot is defeated
+        Bot is defeated either when we encountered one of the checkpoints or got `self.is_bad_guess` case
 
         :return: 1 if bot cant guess, 0 otherwise
         :rtype: int
@@ -87,6 +93,19 @@ class Game:
             )
             and self.session.progression < config.SESSION_PROGRESS_DEFEAT
         )
+
+    async def create_and_start(self, prefix_text: str = ""):
+        """Create new session, save it to DB and send steps"""
+        _, self.session = await create_and_save_session(
+            session_id=self.session_id, redis=self.redis
+        )
+        if self.session:
+            await self.send_step(prefix_text=prefix_text)
+
+        else:
+            await self.manager.send_message(
+                bot=self.bot, msg=self.msg, text=config.TEXT_SERVER_DOWN
+            )
 
     async def send_step(self, prefix_text: str = ""):
         """Send step information to user"""
@@ -101,34 +120,42 @@ class Game:
             ),
         )
 
-    async def send_victory_message(self, guess: dict):
+    async def send_victory_message(self, guess: dict, can_continue: bool = True):
         """Send victory message and image of guess"""
+        if can_continue:
+            message = config.TEXT_VICTORY
+
+        else:
+            message = config.TEXT_VICTORY_WO_CONTINUE
+
         if guess.get("absolute_picture_path", None):
             # Guess without image
             await self.manager.send_image(
                 bot=self.bot,
                 msg=self.msg,
                 url=guess["absolute_picture_path"],
-                text=config.TEXT_VICTORY.format(
+                text=message.format(
                     name=guess["name"], description=guess["description"]
                 ),
             )
+
         else:
             # Guess with image
             await self.manager.send_message(
                 bot=self.bot,
                 msg=self.msg,
-                text=config.TEXT_VICTORY.format(
+                text=message.format(
                     name=guess["name"], description=guess["description"]
                 ),
             )
 
     async def send_defeated_message(self, can_continue: bool = True):
-        """Send defeat message"""
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
-            text=config.TEXT_DEFEATED_CONTINUE if can_continue else config.TEXT_DEFEATED,
+            text=config.TEXT_DEFEATED_CONTINUE
+            if can_continue
+            else config.TEXT_DEFEATED,
         )
 
     async def handle_exception(self, status_code: str) -> bool:
@@ -169,7 +196,11 @@ class Game:
         return False
 
     async def handle_guessed(self):
-        # Guessed. Send answer
+        """Handle possible victory case
+
+        If guess is not repeating, then send victory message.
+        If guess is repeating, then if there is other possible guesses send next step, send defeat message otherwise.
+        """
         status_code = await self.session.win()
         caught_exception = await self.handle_exception(status_code=status_code)
 
@@ -180,10 +211,7 @@ class Game:
             )
             if is_repeating:
                 # Repeated guess
-                no_other_guesses = (
-                    self.session.progression >= config.SESSION_MAXIMUM_PROGRESSION
-                )
-                if no_other_guesses:
+                if not self.are_guesses_left():
                     # Repeated guess got maximum progress, so most probably there is no other guesses
                     self.session.is_ended = 1
                     await save_session(
@@ -208,20 +236,7 @@ class Game:
                 await save_session(
                     session_id=self.session_id, session=self.session, redis=self.redis,
                 )
-                await self.send_victory_message(self.session.first_guess)
-
-    async def create_and_start(self, prefix_text: str = ""):
-        """Create new session, save it to DB and send steps"""
-        _, self.session = await create_and_save_session(
-            session_id=self.session_id, redis=self.redis
-        )
-        if self.session:
-            await self.send_step(prefix_text=prefix_text)
-
-        else:
-            await self.manager.send_message(
-                bot=self.bot, msg=self.msg, text=config.TEXT_SERVER_DOWN
-            )
+                await self.send_victory_message(self.session.first_guess, can_continue=self.can_continue())
 
     async def continue_game(self, answer: str, first_try: bool = True):
         """
@@ -229,7 +244,7 @@ class Game:
 
         :param answer: Text of users answer
         :type answer: str
-        :param first_try: If True, then in case of error run `continue_game` again, restart game otherwise
+        :param first_try: If True, then in case of error run `self.continue_game` again, restart game otherwise
         :type first_try: bool, optional
         """
         try:
@@ -261,7 +276,7 @@ class Game:
                         redis=self.redis,
                     )
 
-        except (ValueError, JSONDecodeError):
+        except (ValueError, JSONDecodeError, ClientConnectionError):
             if first_try:
                 # Wait a little, try again
                 await asyncio.sleep(0.5)
@@ -306,31 +321,22 @@ class Game:
         if not self.session_created:
             # Existed game
             if self.session.is_ended:
-                # Game ended
-                no_other_guesses = (
-                    self.session.progression >= config.SESSION_MAXIMUM_PROGRESSION
-                )
-                if no_other_guesses:
-                    # No other guesses, no reason to continue. Restart game
-                    await self.create_and_start()
+                # There is other guesses
+                if self.can_continue():
+                    # There is other questions
+                    if self.is_victory() or self.is_defeat():
+                        # Continue wrong guess or defeated game
+                        self.session.is_ended = 0
+                        await save_session(
+                            session_id=self.session_id,
+                            session=self.session,
+                            redis=self.redis,
+                        )
+                        await self.send_step()
 
                 else:
-                    # There is other guesses
-                    if self.can_continue():
-                        # There is other questions
-                        if self.is_victory() or self.is_defeat():
-                            # Continue wrong guess or defeated game
-                            self.session.is_ended = 0
-                            await save_session(
-                                session_id=self.session_id,
-                                session=self.session,
-                                redis=self.redis,
-                            )
-                            await self.send_step()
-
-                    else:
-                        # Cant be continued
-                        await self.create_and_start()
+                    # Cant be continued
+                    await self.create_and_start()
 
             else:
                 # Not ended. Continue

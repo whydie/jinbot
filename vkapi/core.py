@@ -87,7 +87,7 @@ async def send_messages(
 
 
 async def after_startup(bot):
-    # Send `Reloading` message to everyone who was playing at the moment
+    # Send reloading-message to last `max_users` users who was playing at the moment
     max_users = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_MAX_USERS
     min_age = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_MIN_AGE
     message_filter = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_FILTER
@@ -107,9 +107,26 @@ async def after_startup(bot):
 async def handle_admin_redis(redis, command, msg):
     # Redis command
     try:
-        response = await eval(command)
+        # Get rid of two parenthesis then make list of attributes and remove `redis` literal
+        params = command[:-2].split(".")[1:]
+
+        if not params:
+            # Wrong params
+            response = config.ADMIN_UNKNOWN_COMMAND_TEXT
+
+        else:
+            # Get first attribute of redis object so we can iterate over next attributes
+            attribute = getattr(redis, params[0])
+
+            # Get last attribute
+            for param in params[1:]:
+                attribute = getattr(attribute, param)
+
+            # Expected that last attribute is async function, so await it
+            response = await attribute()
 
     except Exception as exc:
+        # Send exception message
         response = exc
 
     await msg(response)

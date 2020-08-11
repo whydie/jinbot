@@ -1,6 +1,6 @@
 import json
-import re
 import time
+import re
 
 import aiohttp
 from akinator.async_aki import Akinator as AsyncAkinator
@@ -9,24 +9,8 @@ from jinbot import config
 
 
 info_regex = re.compile("var uid_ext_session = '(.*)'\\;\\n.*var frontaddr = '(.*)'\\;")
-
-# URLs for the API requests
-NEW_SESSION_URL = "https://{}/new_session?callback=jQuery331023608747682107778_{}&urlApiWs={}&partner=1&childMod={}&player=website-desktop&uid_ext_session={}&frontaddr={}&constraint=ETAT<>'AV'&soft_constraint={}&question_filter={}"
-ANSWER_URL = "https://{}/answer_api?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&answer={}&frontaddr={}&question_filter={}"
-BACK_URL = "{}/cancel_answer?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&answer=-1&question_filter={}"
-WIN_URL = "{}/list?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}"
-
-# HTTP headers to use for the requests
-HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate",
-    "Accept-Language": "en-US,en;q=0.9",
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) snap"
-        " Chromium/81.0.4044.92 Chrome/81.0.4044.92 Safari/537.36"
-    ),
-    "x-requested-with": "XMLHttpRequest",
-}
+soft_constraint = "ETAT%3D%27EN%27" if config.AKINATOR_CHILD_MODE == "true" else ""
+question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
 
 def raise_connection_error(response):
@@ -40,10 +24,6 @@ def raise_connection_error(response):
         return "AkiNoQuestions"
 
     return "AkiConnectionFailure"
-
-
-soft_constraint = "ETAT%3D%27EN%27" if config.AKINATOR_CHILD_MODE == "true" else ""
-question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
 
 class Akinator(AsyncAkinator):
@@ -73,17 +53,17 @@ class Akinator(AsyncAkinator):
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                NEW_SESSION_URL.format(
-                    config.uri,
-                    self.timestamp,
-                    config.server,
-                    config.AKINATOR_CHILD_MODE,
-                    self.uid,
-                    self.frontaddr,
-                    soft_constraint,
-                    question_filter,
-                ),
-                headers=HEADERS,
+                    config.NEW_SESSION_URL.format(
+                        config.uri,
+                        self.timestamp,
+                        config.server,
+                        config.AKINATOR_CHILD_MODE,
+                        self.uid,
+                        self.frontaddr,
+                        soft_constraint,
+                        question_filter,
+                    ),
+                    headers=config.HEADERS,
             ) as w:
                 resp = self._parse_response(await w.text())
 
@@ -92,13 +72,12 @@ class Akinator(AsyncAkinator):
 
             return resp["completion"]
 
-        else:
-            return raise_connection_error(resp["completion"])
+        return raise_connection_error(resp["completion"])
 
     async def answer(self, ans):
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                ANSWER_URL.format(
+                config.ANSWER_URL.format(
                     config.uri,
                     self.timestamp,
                     config.server,
@@ -110,7 +89,7 @@ class Akinator(AsyncAkinator):
                     self.frontaddr,
                     question_filter,
                 ),
-                headers=HEADERS,
+                headers=config.HEADERS,
             ) as w:
                 resp = self._parse_response(await w.text())
 
@@ -119,8 +98,7 @@ class Akinator(AsyncAkinator):
 
             return resp["completion"]
 
-        else:
-            return raise_connection_error(resp["completion"])
+        return raise_connection_error(resp["completion"])
 
     async def back(self):
         if self.step == 0:
@@ -128,7 +106,7 @@ class Akinator(AsyncAkinator):
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                BACK_URL.format(
+                config.BACK_URL.format(
                     config.server,
                     self.timestamp,
                     config.AKINATOR_CHILD_MODE,
@@ -137,7 +115,7 @@ class Akinator(AsyncAkinator):
                     self.step,
                     question_filter,
                 ),
-                headers=HEADERS,
+                headers=config.HEADERS,
             ) as w:
                 resp = self._parse_response(await w.text())
 
@@ -146,13 +124,12 @@ class Akinator(AsyncAkinator):
 
             return resp["completion"]
 
-        else:
-            return raise_connection_error(resp["completion"])
+        return raise_connection_error(resp["completion"])
 
     async def win(self):
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                WIN_URL.format(
+                config.WIN_URL.format(
                     config.server,
                     self.timestamp,
                     config.AKINATOR_CHILD_MODE,
@@ -160,7 +137,7 @@ class Akinator(AsyncAkinator):
                     self.signature,
                     self.step,
                 ),
-                headers=HEADERS,
+                headers=config.HEADERS,
             ) as w:
                 resp = self._parse_response(await w.text())
 
@@ -169,8 +146,7 @@ class Akinator(AsyncAkinator):
 
             return resp["completion"]
 
-        else:
-            return raise_connection_error(resp["completion"])
+        return raise_connection_error(resp["completion"])
 
     def dump_session(self):
         dump = {
