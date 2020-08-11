@@ -17,8 +17,7 @@ async def send_messages(
         max_users: typing.Union[int, float],
         earlier: int = 1,
 ):
-    """
-    Send message to a group of users
+    """Send message to a group of users
 
     :param bot: VK bot object
     :param message: Message text
@@ -37,7 +36,6 @@ async def send_messages(
     now = time.time()
 
     while not ended:
-        # noinspection PyBroadException
         try:
             conversations = await bot.api.messages.get_conversations(
                 offset=offset,
@@ -87,7 +85,7 @@ async def send_messages(
 
 
 async def after_startup(bot):
-    # Send reloading-message to last `max_users` users who was playing at the moment
+    """Send reloading-message to last `max_users` users who was playing at the moment"""
     max_users = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_MAX_USERS
     min_age = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_MIN_AGE
     message_filter = config.ADMIN_COMMAND_SEND_MESSAGE_RESTART_FILTER
@@ -105,7 +103,7 @@ async def after_startup(bot):
 
 
 async def handle_admin_redis(redis, command, msg):
-    # Redis command
+    """Redis command. e.g. redis.getdbsize()"""
     try:
         # Get rid of two parenthesis then make list of attributes and remove `redis` literal
         params = command[:-2].split(".")[1:]
@@ -133,6 +131,11 @@ async def handle_admin_redis(redis, command, msg):
 
 
 async def handle_admin_notify(bot, msg, command):
+    """Notify command.
+
+    | e.g. ```notify-all-2000-20-0 Message``` sends `Message` message
+            to 2000 users that has written anything last 20 seconds
+    """
     command_and_text = command.split()
 
     if len(command_and_text) >= 2:

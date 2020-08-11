@@ -8,7 +8,7 @@ from vkbottle import Message
 
 from jinbot import config
 from jinbot.akinator import Akinator
-from jinbot.managers import AbstractManager
+from jinbot.managers import AbstractStrategy
 from jinbot.utils import (
     save_session,
     create_and_save_session,
@@ -39,7 +39,7 @@ class Game:
     def __init__(
         self,
         bot,
-        manager: typing.Type[AbstractManager],
+        manager: typing.Type[AbstractStrategy],
         session_created: bool,
         session: Akinator,
         msg,
@@ -54,19 +54,24 @@ class Game:
         self.redis = redis
 
     def can_continue(self):
+        """Can continue if step limit is not reached and progress is less than maximal"""
         # Akinator counting starts with 0, so minus 1 from max steps
-        return (self.session.step < config.AKINATOR_MAX_STEPS - 1) \
-               and self.session.progression < config.SESSION_PROGRESS_SURE_VICTORY
+        return (
+            self.session.step < config.AKINATOR_MAX_STEPS - 1
+        ) and self.session.progression < config.SESSION_PROGRESS_SURE_VICTORY
 
     def are_guesses_left(self):
-        """There is no other guesses when we already have guessed something and progression is more than maximum progression"""
-        return not(self.session.last_guess and not self.can_continue())
+        """
+        There is no other guesses when we already have guessed something
+        and progression is more than maximal progression
+        """
+        return not (self.session.last_guess and not self.can_continue())
 
     def is_victory(self):
         """
-        It's victory either when `self.session.progression` is more or equal than needed for sure victory
-        or if `self.session.step` is more or equal than minimal needed for unsure victory,
-           and `self.session.progression` is more or equal than needed for unsure victory
+        | It's victory if `self.session.progression` is more or equal than needed for sure victory
+        | or if `self.session.step` is more or equal than minimal needed for unsure victory,
+          and `self.session.progression` is more or equal than needed for unsure victory
         """
 
         is_sure_victory = (
@@ -150,6 +155,11 @@ class Game:
             )
 
     async def send_defeated_message(self, can_continue: bool = True):
+        """Send defeat message to user
+
+        :param can_continue: if `True` then send message with continue menu item, without otherwise
+        :type can_continue: bool, optional
+        """
         await self.manager.send_message(
             bot=self.bot,
             msg=self.msg,
@@ -159,6 +169,15 @@ class Game:
         )
 
     async def handle_exception(self, status_code: str) -> bool:
+        """Handle given API status code
+
+        | AkiTimedOut - restart game
+        | CantGoBackAnyFurther - send current step
+        | AkiNoQuestions - send defeated message without ability to continue
+        | AkiServerDown - try to update server region related `uri` and `server`
+        :param status_code: Status code of response from game API.
+        :type status_code: str, optional
+        """
         if status_code == "AkiTimedOut":
             # Session expired. Restart game
             _, self.session = await create_and_save_session(
@@ -198,8 +217,8 @@ class Game:
     async def handle_guessed(self):
         """Handle possible victory case
 
-        If guess is not repeating, then send victory message.
-        If guess is repeating, then if there is other possible guesses send next step, send defeat message otherwise.
+        | If guess is not repeating, then send victory message.
+        | If guess is repeating, then if there is other possible guesses send next step, send defeat message otherwise.
         """
         status_code = await self.session.win()
         caught_exception = await self.handle_exception(status_code=status_code)
@@ -212,7 +231,7 @@ class Game:
             if is_repeating:
                 # Repeated guess
                 if not self.are_guesses_left():
-                    # Repeated guess got maximum progress, so most probably there is no other guesses
+                    # Repeated guess got maximal progress, so most probably there is no other guesses
                     self.session.is_ended = 1
                     await save_session(
                         session_id=self.session_id,
@@ -236,11 +255,12 @@ class Game:
                 await save_session(
                     session_id=self.session_id, session=self.session, redis=self.redis,
                 )
-                await self.send_victory_message(self.session.first_guess, can_continue=self.can_continue())
+                await self.send_victory_message(
+                    self.session.first_guess, can_continue=self.can_continue()
+                )
 
     async def continue_game(self, answer: str, first_try: bool = True):
-        """
-        Not completed. Continue to play
+        """Not completed. Continue to play
 
         :param answer: Text of users answer
         :type answer: str
@@ -287,7 +307,7 @@ class Game:
                 await self.create_and_start(prefix_text=config.TEXT_ANSWER_ERROR)
 
     async def handle_answer(self, answer: str):
-        # Known answer
+        """Pass given answer to the game API if it's not ended, send steps otherwise"""
         if not self.session_created:
             # Session already existed
             if self.session.is_ended:
@@ -303,21 +323,28 @@ class Game:
             await self.send_step()
 
     async def handle_back(self):
-        # Ongoing game
-        status_code = await self.session.back()
-        caught_exception = await self.handle_exception(status_code=status_code)
-
-        if not caught_exception:
-            if self.session.is_ended:
-                # Game was ended. Start it, so player could continue
-                self.session.is_ended = 0
-
-            await save_session(
-                session_id=self.session_id, session=self.session, redis=self.redis,
-            )
+        """Return to the previous step"""
+        if self.session_created or self.session.step == 0:
+            # Just created game or it's already first step, no need to go back
             await self.send_step()
 
+        else:
+            # Existed game
+            status_code = await self.session.back()
+            caught_exception = await self.handle_exception(status_code=status_code)
+
+            if not caught_exception:
+                if self.session.is_ended:
+                    # Game was ended. Start it, so player could continue
+                    self.session.is_ended = 0
+
+                await save_session(
+                    session_id=self.session_id, session=self.session, redis=self.redis,
+                )
+                await self.send_step()
+
     async def handle_continue(self):
+        """Continue game if it was ended. If it's not possible, then restart it"""
         if not self.session_created:
             # Existed game
             if self.session.is_ended:
@@ -348,7 +375,7 @@ class Game:
     @staticmethod
     async def handle_restart(
         bot,
-        manager: typing.Type[AbstractManager],
+        manager: typing.Type[AbstractStrategy],
         msg: Message,
         redis: Redis,
         chat_id: str,
@@ -374,17 +401,16 @@ class Game:
     @staticmethod
     async def factory_game(
         bot,
-        manager: typing.Type[AbstractManager],
+        manager: typing.Type[AbstractStrategy],
         msg: Message,
         redis: Redis,
         chat_id: str,
     ):
-        """
-        Factory method that returns Game object
+        """Factory method that returns Game object
 
         :param bot: Bot object that contains API-methods of specific interface
         :param manager: Message Manager object
-        :type manager: AbstractManager
+        :type manager: AbstractStrategy
         :param msg: Users Message object
         :type msg: Message
         :param redis: Connection to DB object

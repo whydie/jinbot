@@ -14,6 +14,7 @@ question_filter = "cat%3D1" if config.AKINATOR_CHILD_MODE == "false" else ""
 
 
 def raise_connection_error(response):
+    """Match game API status codes to local status codes"""
     if response == "KO - SERVER DOWN":
         return "AkiServerDown"
 
@@ -27,6 +28,13 @@ def raise_connection_error(response):
 
 
 class Akinator(AsyncAkinator):
+    """Custom Akinator class that was changed for performance needs
+
+    :param is_ended: Flag that used for conditional cases
+    :type is_ended: int, optional
+    :param last_guess: Name of last guess
+    :type last_guess: str, optional
+    """
     def __init__(self, is_ended: int = 0, last_guess: str = ""):
         super().__init__()
         self.is_ended = is_ended
@@ -48,6 +56,7 @@ class Akinator(AsyncAkinator):
         return json.loads(",".join(response.split("(")[1::])[:-1])
 
     async def start_game(self, **kwargs):
+        """Get session info from game API"""
         self.timestamp = time.time()
         await self._get_session_info()
 
@@ -75,6 +84,7 @@ class Akinator(AsyncAkinator):
         return raise_connection_error(resp["completion"])
 
     async def answer(self, ans):
+        """Send `answer` request to game API"""
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 config.ANSWER_URL.format(
@@ -101,6 +111,7 @@ class Akinator(AsyncAkinator):
         return raise_connection_error(resp["completion"])
 
     async def back(self):
+        """Send `back` request to game API"""
         if self.step == 0:
             return "CantGoBackAnyFurther"
 
@@ -127,6 +138,7 @@ class Akinator(AsyncAkinator):
         return raise_connection_error(resp["completion"])
 
     async def win(self):
+        """Send `win` request to game API"""
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 config.WIN_URL.format(
@@ -149,6 +161,11 @@ class Akinator(AsyncAkinator):
         return raise_connection_error(resp["completion"])
 
     def dump_session(self):
+        """Serialize session information to JSON
+
+        :return: JSON formatted string that contains session information
+        :rtype: str
+        """
         dump = {
             "timestamp": self.timestamp,
             "session": self.session,
@@ -174,6 +191,11 @@ class Akinator(AsyncAkinator):
         return json.dumps(dump)
 
     def load_session(self, dump):
+        """Load session information from json dump
+
+        :param dump: JSON serialized information that used to fill session object
+        :type dump: str
+        """
         loaded = json.loads(dump)
 
         self.timestamp = loaded["timestamp"]

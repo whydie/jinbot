@@ -9,7 +9,7 @@ from vkbottle.utils.exceptions import VKError
 
 from jinbot import config
 from jinbot.core import Game
-from jinbot.managers import VKManager
+from jinbot.managers import VKStrategy
 
 from vkapi.utils import remove_admin_prefix
 from vkapi.rules import CommandFromAdmin
@@ -72,7 +72,7 @@ async def handle_leave(event: GroupJoin):
 
 @bot.on.message_handler(ChatActionRule("chat_invite_user"))
 async def handle_invite(msg: Message):
-    await VKManager.send_message(
+    await VKStrategy.send_message(
         bot=bot,
         msg=msg,
         text=config.TEXT_CHAT_INVITE.format(group_id=config.VK_GROUP_ID),
@@ -82,7 +82,7 @@ async def handle_invite(msg: Message):
 @bot.on.message_handler(text=config.ANSWER_BACK)
 async def handle_back(msg: Message):
     game = await Game.factory_game(
-        bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
+        bot=bot, manager=VKStrategy, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
     if game:
         await game.handle_back()
@@ -93,7 +93,7 @@ async def handle_back(msg: Message):
 @bot.on.message_handler(text=config.ANSWER_CONTINUE)
 async def handle_continue(msg: Message):
     game = await Game.factory_game(
-        bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
+        bot=bot, manager=VKStrategy, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
     if game:
         await game.handle_continue()
@@ -105,7 +105,7 @@ async def handle_continue(msg: Message):
 @bot.on.message_handler(text=config.ANSWER_RESTART)
 async def handle_restart(msg: Message):
     await Game.handle_restart(
-        bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
+        bot=bot, manager=VKStrategy, msg=msg, redis=redis, chat_id=str(msg.chat_id)
     )
 
 
@@ -115,7 +115,7 @@ async def handle_answer(msg: Message):
     if answer:
         # Known answer
         game = await Game.factory_game(
-            bot=bot, manager=VKManager, msg=msg, redis=redis, chat_id=str(msg.chat_id)
+            bot=bot, manager=VKStrategy, msg=msg, redis=redis, chat_id=str(msg.chat_id)
         )
 
         if game:
@@ -126,7 +126,7 @@ async def handle_answer(msg: Message):
 
     else:
         # Unknown answer
-        await VKManager.send_message(bot=bot, msg=msg, text=config.TEXT_UNKNOWN_COMMAND)
+        await VKStrategy.send_message(bot=bot, msg=msg, text=config.TEXT_UNKNOWN_COMMAND)
 
 
 if __name__ == "__main__":

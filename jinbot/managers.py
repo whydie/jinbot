@@ -7,22 +7,36 @@ from vkbottle import Message, Bot
 from vkbottle.utils.exceptions import VKError
 
 
-class AbstractManager(ABC):
+class AbstractStrategy(ABC):
     # String that used as a prefix for key in DB
     prefix = NotImplemented
 
     @staticmethod
     @abstractmethod
-    def send_message(bot, msg: Message, text: str):
+    def send_message(bot, msg, text: str = ""):
+        """
+        :param bot: Object that aggregates API related functions
+        :param msg: Users message object
+        :param text: Text of the message that needed to be sent to user
+        :type text: str
+        """
         ...
 
     @staticmethod
     @abstractmethod
-    def send_image(bot, msg: Message, url: str, text: str):
+    def send_image(bot, msg, url: str = "", text: str = ""):
+        """
+        :param bot: Object that aggregates API related functions
+        :param msg: Users message object
+        :param url: URL path to the image that will be send to user
+        :type url: str
+        :param text: Text of the message that needed to be sent to user
+        :type text: str
+        """
         ...
 
 
-class VKManager(AbstractManager):
+class VKStrategy(AbstractStrategy):
     prefix = "VK"
 
     @staticmethod
@@ -55,6 +69,7 @@ class VKManager(AbstractManager):
 
     @staticmethod
     async def send_message(bot: Bot, msg: Message, text: str):
+        """Send message to user"""
         try:
             await msg(text)
         except VKError:
@@ -74,7 +89,7 @@ class VKManager(AbstractManager):
         :param text: Text of users message
         :type text: str, optional
         """
-        image = await VKManager.get_or_create_image(bot=bot, peer_id=msg.peer_id, url=url)
+        image = await VKStrategy.get_or_create_image(bot=bot, peer_id=msg.peer_id, url=url)
         if image:
             try:
                 if text:

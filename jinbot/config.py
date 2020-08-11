@@ -9,46 +9,28 @@ server_regex = re.compile(
 )
 
 
-def _auto_get_region(lang, theme):
-    """Automatically get the uri and server from akinator.com for the specified language and theme"""
+def _auto_get_region():
+    """Automatically get the `uri` and `server` from akinator.com for the specified language and theme"""
 
-    uri_ = lang + ".akinator.com"
+    uri_ = "ru.akinator.com"
 
     response = requests.get("https://" + uri_)
     match = server_regex.search(response.text)
 
     parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
 
-    if theme == "c":
-        return {
-            "uri": uri_,
-            "server": next((i for i in parsed if i["subject_id"] == "1"), None)[
-                "urlWs"
-            ],
-        }
-
-    if theme == "a":
-        return {
-            "uri": uri_,
-            "server": next((i for i in parsed if i["subject_id"] == "14"), None)[
-                "urlWs"
-            ],
-        }
-
-    if theme == "o":
-        return {
-            "uri": uri_,
-            "server": next((i for i in parsed if i["subject_id"] == "2"), None)[
-                "urlWs"
-            ],
-        }
-
-    return None
+    return {
+        "uri": uri_,
+        "server": next((i for i in parsed if i["subject_id"] == "1"), None)[
+            "urlWs"
+        ],
+    }
 
 
 def init_akinator():
+    """Initialize global variables, that contain Akinator `uri` and `server` information"""
     global uri, server
-    region_info = _auto_get_region("ru", "c")
+    region_info = _auto_get_region()
     if region_info:
         uri, server = region_info["uri"], region_info["server"]
 

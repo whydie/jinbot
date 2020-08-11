@@ -1,6 +1,6 @@
 import asyncio
 import typing
-from concurrent.futures import TimeoutError
+from concurrent import futures
 from json.decoder import JSONDecodeError
 
 from aiohttp import ClientConnectionError
@@ -11,8 +11,7 @@ from jinbot import config
 
 
 def get_object_key(manager, *object_path: str) -> str:
-    """
-    Create key for object in DB
+    """Create key for object in DB
 
     :param manager: Message Manager object
     :type manager: AbstractManager
@@ -24,6 +23,7 @@ def get_object_key(manager, *object_path: str) -> str:
 
 
 def update_region():
+    """Update region related `uri` and `server` """
     region_info = config.auto_get_region("ru", "c")
     config.uri, config.server = region_info["uri"], region_info["server"]
 
@@ -31,8 +31,7 @@ def update_region():
 async def create_session(
     first_try: bool = True, is_ended: int = 0
 ) -> typing.Optional[Akinator]:
-    """
-    Create session object and start it
+    """Create session object and start it
 
     :param first_try: if True, then in case of Error try again, dont try otherwise
     :type first_try: bool, optional
@@ -53,7 +52,7 @@ async def create_session(
 
         return session
 
-    except (JSONDecodeError, AttributeError, ClientConnectionError, TimeoutError):
+    except (JSONDecodeError, AttributeError, ClientConnectionError, futures.TimeoutError):
         if first_try:
             # Some problem with Akinator API. Wait a little and try again
             await asyncio.sleep(0.5)
@@ -64,8 +63,7 @@ async def create_session(
 
 
 async def save_session(session_id: str, session: Akinator, redis: Redis) -> Akinator:
-    """
-    Dump session object and save it in DB
+    """Dump session object and save it in DB
 
     :param session_id: Unique ID that used as a key for Session object in DB
     :type session_id: str
@@ -85,8 +83,7 @@ async def save_session(session_id: str, session: Akinator, redis: Redis) -> Akin
 async def create_and_save_session(
     session_id: str, redis: Redis, is_ended: int = 0
 ) -> typing.Tuple[bool, typing.Optional[Akinator]]:
-    """
-    Remove session and create new one
+    """Remove session and create new one
 
     :param session_id: Unique ID that used as a key for Session object in DB
     :type session_id: str
@@ -109,8 +106,7 @@ async def create_and_save_session(
 async def get_or_create_session(
     session_id: str, redis: Redis
 ) -> typing.Tuple[bool, typing.Optional[Akinator]]:
-    """
-    Find Session object in DB, create if not founded
+    """Find Session object in DB, create if not founded
 
     :param session_id: Unique ID that used as a key for Session object in DB
     :type session_id: str
