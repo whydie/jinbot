@@ -10,6 +10,12 @@ from jinbot.akinator import Akinator
 from jinbot import config
 
 
+def update_region():
+    """Update region related `uri` and `server` """
+    region_info = config.auto_get_region()
+    config.uri, config.server = region_info["uri"], region_info["server"]
+
+
 def get_object_key(manager, *object_path: str) -> str:
     """Create key for object in DB
 
@@ -20,12 +26,6 @@ def get_object_key(manager, *object_path: str) -> str:
     :return: Unique key for object
     """
     return "||".join([manager.prefix, *object_path])
-
-
-def update_region():
-    """Update region related `uri` and `server` """
-    region_info = config.auto_get_region("ru", "c")
-    config.uri, config.server = region_info["uri"], region_info["server"]
 
 
 async def create_session(
