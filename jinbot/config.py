@@ -9,7 +9,7 @@ server_regex = re.compile(
 )
 
 
-def _auto_get_region():
+def auto_get_region():
     """Automatically get the `uri` and `server` from akinator.com for the specified language and theme"""
 
     uri_ = "ru.akinator.com"
@@ -30,7 +30,7 @@ def _auto_get_region():
 def init_akinator():
     """Initialize global variables, that contain Akinator `uri` and `server` information"""
     global uri, server
-    region_info = _auto_get_region()
+    region_info = auto_get_region()
     if region_info:
         uri, server = region_info["uri"], region_info["server"]
 

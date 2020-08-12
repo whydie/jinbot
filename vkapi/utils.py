@@ -1,6 +1,7 @@
-from jinbot import config
-
 import traceback
+import typing
+
+from jinbot import config
 
 
 def remove_admin_prefix(text: str) -> str:
@@ -14,12 +15,12 @@ def remove_admin_prefix(text: str) -> str:
     return text[len(config.ADMIN_COMMAND_PREFIX) :]
 
 
-def extract_params(command_and_text):
+def extract_params(command_and_text: str) -> typing.Tuple[str, str, str, int, int, int]:
     """Extract params from admin command
 
     :param command_and_text: String that contains command, params and text of message
     :type command_and_text: str
-    :return: `command, text, message_filter, max_users, min_age, earlier` that parsed from given string
+    :return: tuple of `command, text, message_filter, max_users, min_age, earlier` that parsed from given string
     :rtype: tuple
     """
     command_and_params = command_and_text[0].split("-")
@@ -69,7 +70,7 @@ def extract_users(conversations: list, min_age: int, now: float, earlier: int) -
             # Older than min age
             user_ids = [
                 conversation.last_message.peer_id
-                for conversation in conversations.items
+                for conversation in conversations
                 if getattr(conversation, "last_message", False)
                 and ((now - conversation.last_message.date) > min_age)
             ]
@@ -78,7 +79,7 @@ def extract_users(conversations: list, min_age: int, now: float, earlier: int) -
             # Younger than min age
             user_ids = [
                 conversation.last_message.peer_id
-                for conversation in conversations.items
+                for conversation in conversations
                 if getattr(conversation, "last_message", False)
                 and (now - conversation.last_message.date) < min_age
             ]

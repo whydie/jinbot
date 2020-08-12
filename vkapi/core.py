@@ -53,7 +53,7 @@ async def send_messages(
                 await asyncio.sleep(config.ADMIN_TIMEOUT_NOTIFY)
                 offset += 200
 
-                user_ids = extract_users(conversations, min_age, now, earlier)
+                user_ids = extract_users(conversations.items, min_age, now, earlier)
                 first_id = max_users if max_users < len(user_ids) else 100
 
                 if user_ids:
