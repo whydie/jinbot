@@ -1,5 +1,6 @@
 import os
 import traceback
+import asyncio
 
 import aioredis
 from vkbottle import Bot, Message, PhotoUploader
@@ -16,14 +17,20 @@ from vkapi.rules import CommandFromAdmin
 from vkapi.core import handle_admin_notify, handle_admin_redis, after_startup
 
 
-bot = Bot(os.getenv("VK_KEY"), debug=config.DEBUG)
-redis = bot.loop.run_until_complete(aioredis.create_redis_pool("redis://localhost", password=os.getenv("REDIS_KEY")))
+group_token = os.getenv("VK_KEY")
+loop = asyncio.get_event_loop()
+
+bot = Bot(group_token, loop=loop, debug=config.DEBUG)
+bot.group_id = Bot.get_id_by_token(token=group_token, loop=loop)
+
+redis = bot.loop.run_until_complete(aioredis.create_redis_pool(f"redis://{config.REDIS_HOST}", password=os.getenv("REDIS_KEY")))
+
 uploader = PhotoUploader(bot.api, generate_attachment_strings=True)
 setattr(bot, "uploader", uploader)
 
 # Get admin list
-get_members = bot.loop.run_until_complete(bot.api.groups.get_members(group_id=bot.group_id, filter="managers"))
-admin_list = [user.id for user in get_members.items]
+managers = bot.loop.run_until_complete(bot.api.groups.get_members(group_id=bot.group_id, filter="managers"))
+admin_list = [user.id for user in managers.items]
 
 
 @bot.on.message_handler(CommandFromAdmin(admin_list=admin_list))

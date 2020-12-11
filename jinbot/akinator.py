@@ -43,7 +43,7 @@ class Akinator(AsyncAkinator):
     async def _get_session_info(self):
         """Get uid and frontaddr from akinator.com/game"""
         async with aiohttp.ClientSession() as session:
-            async with session.get("https://en.akinator.com/game") as w:
+            async with session.get("https://ru.akinator.com/game") as w:
                 match = info_regex.search(await w.text())
 
         self.uid, self.frontaddr = match.groups()[0], match.groups()[1]

@@ -239,4 +239,8 @@ ADMIN_COMMAND_SEND_MESSAGE_RESTART_EARLIER = 0  # 0 Younger than min age, 1 Olde
 # *** Other settings
 DEBUG = False
 VK_GROUP_ID = "bot_jin"
+if DEBUG:
+    REDIS_HOST = "127.0.0.1"
+else:
+    REDIS_HOST = "redis"
 # Other settings ***

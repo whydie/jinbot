@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:6-alpine
+    command: redis-server --requirepass bfdd590c4eee1
+    container_name: redis
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+
+  jinbot:
+    build: .
+    container_name: jinbot
+    hostname: jinbot
+    environment:
+      - VK_KEY=cf341b37886f5f864bb965d5baa32cbbb5bfdd590c4eee1f5d6c9e4a0ef78182b367fa34f980ecb265165
+      - REDIS_KEY=bfdd590c4eee1
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: bash -c "python server.py"
